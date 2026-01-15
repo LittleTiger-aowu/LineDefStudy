@@ -33,9 +33,9 @@ all_releases = {'activemq': ['activemq-5.0.0', 'activemq-5.1.0', 'activemq-5.2.0
 
 all_projs = list(all_train_releases.keys())
 
-file_lvl_gt = '../datasets/preprocessed_data/'
+file_lvl_gt = 'E:/project/WYP/LineDefStudy/Dataset/preprocessed_data/'
 
-word2vec_dir = '../output/Word2Vec_model/' 
+word2vec_dir = 'E:/project/WYP/LineDefStudy/Dataset/output/Word2Vec_model/'
 
 
 def batch_generator(code, label, word_edge, line_edge, batch_size, random_seed=0):
@@ -91,7 +91,7 @@ def pad_line_edge_index(line_egde_index_list, max_sent_len, limit_sent_len=True)
 def get_df(rel, is_baseline=False):
 
     if is_baseline:
-        df = pd.read_csv('../'+file_lvl_gt+rel+".csv")
+        df = pd.read_csv('Dataset/'+file_lvl_gt+rel+".csv")
 
     else:
         df = pd.read_csv(file_lvl_gt+rel+".csv")
@@ -261,7 +261,7 @@ def get_w2v_path():
 
 
 def get_w2v_weight_for_deep_learning_models(word2vec_model, embed_dim):
-    word2vec_weights = torch.FloatTensor(word2vec_model.wv.syn0)
+    word2vec_weights = torch.FloatTensor(word2vec_model.wv.vectors)
     word2vec_weights = torch.cat((word2vec_weights, torch.zeros(1, embed_dim)))
     return word2vec_weights
 
@@ -290,7 +290,7 @@ def pad_code(code_list_3d, max_sent_len, limit_sent_len=True, mode='train'):
     return paded
 
 def get_x_vec(code_3d, word2vec):
-    x_vec = [[[word2vec.wv.vocab[token].index if token in word2vec.wv.vocab else len(word2vec.wv.vocab) for token in text]
+    x_vec = [[[word2vec.wv.key_to_index[token] if token in word2vec.wv.key_to_index else len(word2vec.wv.key_to_index) for token in text]
          for text in texts] for texts in code_3d]
     
     return x_vec

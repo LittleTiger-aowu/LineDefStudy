@@ -10,11 +10,11 @@ from torch.utils import data
 from tqdm import tqdm
 
 sys.path.append('../')
-from DeepLineDP_model import *
-from my_util import *
+from DeepLineDP.script.DeepLineDP_model import *
+from script.my_util import *
 
-model_dir = '../../output/model/RF-line-level/'
-result_dir = '../../output/RF-line-level-result/'
+model_dir = 'Dataset/output/model/RF-line-level/'
+result_dir = 'Dataset/output/RF-line-level-result/'
 
 if not os.path.exists(model_dir):
     os.makedirs(model_dir)
@@ -39,10 +39,10 @@ def get_DeepLineDP_and_W2V(dataset_name):
 
     word2vec_file_dir = os.path.join(w2v_dir,dataset_name+'-'+str(embed_dim)+'dim.bin')
 
-    word2vec = Word2Vec.load('../'+word2vec_file_dir)
+    word2vec = Word2Vec.load('Dataset/'+word2vec_file_dir)
     print('load Word2Vec for',dataset_name,'finished')
 
-    total_vocab = len(word2vec.wv.vocab)
+    total_vocab = len(word2vec.wv.key_to_index)
 
     vocab_size = total_vocab +1 # for unknown tokens
     
@@ -58,7 +58,7 @@ def get_DeepLineDP_and_W2V(dataset_name):
         use_layer_norm=use_layer_norm,
         dropout=0.001)
 
-    checkpoint = torch.load('../../output/model/DeepLineDP/'+dataset_name+'/checkpoint_7epochs.pth')
+    checkpoint = torch.load('Dataset/output/model/DeepLineDP/'+dataset_name+'/checkpoint_7epochs.pth')
 
 
     model.load_state_dict(checkpoint['model_state_dict'])

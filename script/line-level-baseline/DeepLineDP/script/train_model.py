@@ -52,10 +52,10 @@ exp_name = args.exp_name
 
 max_train_LOC = 900
 
-prediction_dir = '../output/prediction/DeepLineDP/'
-save_model_dir = '../output/model/DeepLineDP/'
+prediction_dir = 'Dataset/output/prediction/DeepLineDP/'
+save_model_dir = 'Dataset/output/model/DeepLineDP/'
 
-file_lvl_gt = '../../../datasets/preprocessed_data/'
+file_lvl_gt = 'Dataset/preprocessed_data/'
 
 weight_dict = {}
 
@@ -80,7 +80,7 @@ def get_loss_weight(labels):
 
 def train_model(dataset_name):
 
-    loss_dir = '../output/loss/DeepLineDP/'
+    loss_dir = 'Dataset/output/loss/DeepLineDP/'
     actual_save_model_dir = save_model_dir+dataset_name+'/'
 
     if not exp_name == '':
@@ -116,7 +116,7 @@ def train_model(dataset_name):
 
     word2vec_weights = get_w2v_weight_for_deep_learning_models(word2vec, embed_dim)
 
-    vocab_size = len(word2vec.wv.vocab)  + 1 # for unknown tokens
+    vocab_size = len(word2vec.wv.key_to_index)  + 1 # for unknown tokens
 
     x_train_vec = get_x_vec(train_code3d, word2vec)
     x_valid_vec = get_x_vec(valid_code3d, word2vec)

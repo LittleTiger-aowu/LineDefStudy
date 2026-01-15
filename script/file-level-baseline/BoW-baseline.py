@@ -10,7 +10,7 @@ from baseline_util import *
 
 sys.path.append('../')
 
-from my_util import *
+from script.my_util import *
 
 from imblearn.over_sampling import SMOTE 
 
@@ -23,8 +23,8 @@ arg.add_argument('-predict',action='store_true')
 
 args = arg.parse_args()
 
-save_model_dir = '../../output/model/BoW/'
-save_prediction_dir = '../../output/prediction/BoW/'
+save_model_dir = 'Dataset/output/model/BoW/'
+save_prediction_dir = 'Dataset/output/prediction/BoW/'
 
 if not os.path.exists(save_model_dir):
     os.makedirs(save_model_dir)

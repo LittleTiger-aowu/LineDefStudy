@@ -5,11 +5,11 @@ from tqdm import tqdm
 
 from my_util import *
 
-base_data_dir = '../datasets/preprocessed_data/'
-base_original_data_dir = '../datasets/original/File-level/'
+base_data_dir = 'E:/project/WYP/LineDefStudy/Dataset/preprocessed_data/'
+base_original_data_dir = 'E:/project/WYP/LineDefStudy/Dataset/original/File-level/'
 
-data_for_ngram_dir = '../datasets/n_gram_data/'
-data_for_error_prone_dir = '../datasets/ErrorProne_data/'
+data_for_ngram_dir = 'E:/project/WYP/LineDefStudy/Dataset/n_gram_data/'
+data_for_error_prone_dir = 'E:/project/WYP/LineDefStudy/Dataset/ErrorProne_data/'
 
 proj_names = list(all_train_releases.keys())
 
@@ -82,7 +82,7 @@ def export_errorprone_data(proj_name):
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
-        data_df = pd.read_csv(base_original_data_dir+rel+'_ground-truth-files_dataset.csv', encoding='latin')
+        data_df = pd.read_csv(base_original_data_dir+rel+'_ground-truth-files_E:/project/WYP/LineDefStudy/Dataset.csv', encoding='latin')
 
         data_df = data_df[data_df['Bug']==True]
 

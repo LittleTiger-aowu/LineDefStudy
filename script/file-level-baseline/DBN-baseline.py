@@ -16,7 +16,7 @@ sys.path.append('../')
 
 from tqdm import tqdm
 
-from my_util import *
+from script.my_util import *
 
 arg = argparse.ArgumentParser()
 arg.add_argument('-dataset',type=str, default='activemq', help='software project name (lowercase)')
@@ -38,8 +38,8 @@ hidden_layers_structure = [100]*10
 embed_dim = 50
 exp_name = arg.exp_name
 
-save_model_dir = '../../output/model/DBN/'
-save_prediction_dir = '../../output/prediction/DBN/'
+save_model_dir = 'Dataset/output/model/DBN/'
+save_prediction_dir = 'Dataset/output/prediction/DBN/'
 
 if not os.path.exists(save_prediction_dir):
     os.makedirs(save_prediction_dir)
@@ -65,7 +65,7 @@ def train_model(dataset_name):
         os.makedirs(actual_save_model_dir)
 
     w2v_dir = get_w2v_path()
-    w2v_dir = os.path.join('../'+w2v_dir,dataset_name+'-'+str(embed_dim)+'dim.bin')
+    w2v_dir = os.path.join('Dataset/'+w2v_dir,dataset_name+'-'+str(embed_dim)+'dim.bin')
 
     train_rel = all_train_releases[dataset_name]
 
@@ -75,7 +75,7 @@ def train_model(dataset_name):
 
     word2vec_model = Word2Vec.load(w2v_dir)
 
-    padding_idx = word2vec_model.wv.vocab['<pad>'].index
+    padding_idx = word2vec_model.wv.key_to_index['<pad>']
 
     token_idx = convert_to_token_index(word2vec_model, train_code, padding_idx)
 
@@ -107,7 +107,7 @@ def train_model(dataset_name):
 def predict_defective_files_in_releases(dataset_name):
 
     w2v_dir = get_w2v_path()
-    w2v_dir = os.path.join('../'+w2v_dir,dataset_name+'-'+str(embed_dim)+'dim.bin')
+    w2v_dir = os.path.join('Dataset/'+w2v_dir,dataset_name+'-'+str(embed_dim)+'dim.bin')
 
     train_rel = all_train_releases[dataset_name]
     eval_rel = all_eval_releases[dataset_name][1:]
@@ -123,7 +123,7 @@ def predict_defective_files_in_releases(dataset_name):
     # find max sequence from training data (for later padding)
     max_seq_len = min(max([len(cv) for cv in train_codevec]),45000)    
 
-    padding_idx = word2vec_model.wv.vocab['<pad>'].index
+    padding_idx = word2vec_model.wv.key_to_index['<pad>']
 
     token_idx = convert_to_token_index(word2vec_model, train_code, padding_idx)
 

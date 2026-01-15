@@ -42,9 +42,9 @@ dropout = args.dropout
 save_every_epochs = 5
 exp_name = args.exp_name
 
-save_model_dir = '../output/model/DeepLineDP/'
-intermediate_output_dir = '../output/intermediate_output/DeepLineDP/within-release/'
-prediction_dir = '../output/prediction/DeepLineDP/within-release/'
+save_model_dir = 'Dataset/output/model/DeepLineDP/'
+intermediate_output_dir = 'Dataset/output/intermediate_output/DeepLineDP/within-release/'
+prediction_dir = 'Dataset/output/prediction/DeepLineDP/within-release/'
 
 if not os.path.exists(prediction_dir):
     os.makedirs(prediction_dir)
@@ -63,7 +63,7 @@ def predict_defective_files_in_releases(dataset_name, target_epochs):
     word2vec = Word2Vec.load(word2vec_file_dir)
     print('load Word2Vec for',dataset_name,'finished')
 
-    total_vocab = len(word2vec.wv.vocab)
+    total_vocab = len(word2vec.wv.key_to_index)
 
     vocab_size = total_vocab +1 # for unknown tokens
   

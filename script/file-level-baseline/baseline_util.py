@@ -56,7 +56,7 @@ def get_code_vec(code, w2v_model):
     codevec = []
 
     for c in code:
-        codevec.append([w2v_model.wv.vocab[word].index if word in w2v_model.wv.vocab else len(w2v_model.wv.vocab) for word in c.split()])
+        codevec.append([w2v_model.wv.key_to_index[word] if word in w2v_model.wv.key_to_index else len(w2v_model.wv.key_to_index) for word in c.split()])
 
     return codevec
 

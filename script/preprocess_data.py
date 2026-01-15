@@ -4,8 +4,8 @@ import numpy as np
 
 from my_util import *
 
-data_root_dir = '../datasets/original/'
-save_dir = "../datasets/preprocessed_data/"
+data_root_dir = 'E:/project/WYP/LineDefStudy/E:/project/WYP/LineDefStudy/Dataset/original/'
+save_dir = "E:/project/WYP/LineDefStudy/E:/project/WYP/LineDefStudy/Dataset/preprocessed_data/"
 
 char_to_remove = ['+','-','*','/','=','++','--','\\','<str>','<char>','|','&','!']
 

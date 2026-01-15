@@ -17,7 +17,7 @@ from baseline_util import *
 # for importing file from previous directory
 sys.path.append('../')
 
-from my_util import *
+from script.my_util import *
 
 arg = argparse.ArgumentParser()
 arg.add_argument('-dataset',type=str, default='activemq', help='software project name (lowercase)')
@@ -46,8 +46,8 @@ save_every_epochs = 1
 max_seq_len = 50
 
 
-save_model_dir = '../../output/model/Bi-LSTM/'
-save_prediction_dir = '../../output/prediction/Bi-LSTM/'
+save_model_dir = 'Dataset/output/model/Bi-LSTM/'
+save_prediction_dir = 'Dataset/output/prediction/Bi-LSTM/'
 
 if not os.path.exists(save_prediction_dir):
     os.makedirs(save_prediction_dir)
@@ -113,7 +113,7 @@ class LSTMClassifier(nn.Module):
 
 def train_model(dataset_name):
 
-    loss_dir = '../../output/loss/Bi-LSTM/'
+    loss_dir = 'Dataset/output/loss/Bi-LSTM/'
     actual_save_model_dir = save_model_dir+dataset_name+'/'
 
     if not exp_name == '':
@@ -127,7 +127,7 @@ def train_model(dataset_name):
         os.makedirs(loss_dir)
 
     w2v_dir = get_w2v_path()
-    w2v_dir = os.path.join('../'+w2v_dir,dataset_name+'-'+str(embed_dim)+'dim.bin')
+    w2v_dir = os.path.join('Dataset/'+w2v_dir,dataset_name+'-'+str(embed_dim)+'dim.bin')
 
     train_rel = all_train_releases[dataset_name]
     valid_rel = all_eval_releases[dataset_name][0]
@@ -141,9 +141,9 @@ def train_model(dataset_name):
 
     word2vec_model = Word2Vec.load(w2v_dir)
 
-    padding_idx = word2vec_model.wv.vocab['<pad>'].index
+    padding_idx = word2vec_model.wv.key_to_index['<pad>']
 
-    vocab_size = len(word2vec_model.wv.vocab)+1
+    vocab_size = len(word2vec_model.wv.key_to_index)+1
         
     train_dl = get_dataloader(word2vec_model, train_code,train_label, padding_idx, batch_size)
     valid_dl = get_dataloader(word2vec_model, valid_code,valid_label, padding_idx, batch_size)
@@ -256,14 +256,14 @@ def predict_defective_files_in_releases(dataset_name, target_epochs = 6):
     actual_save_model_dir = save_model_dir+dataset_name+'/'
 
     w2v_dir = get_w2v_path()
-    w2v_dir = os.path.join('../'+w2v_dir,dataset_name+'-'+str(embed_dim)+'dim.bin')
+    w2v_dir = os.path.join('Dataset/'+w2v_dir,dataset_name+'-'+str(embed_dim)+'dim.bin')
 
     train_rel = all_train_releases[dataset_name]
     eval_rels = all_eval_releases[dataset_name][1:]
 
     word2vec_model = Word2Vec.load(w2v_dir)
     
-    vocab_size = len(word2vec_model.wv.vocab) + 1
+    vocab_size = len(word2vec_model.wv.key_to_index) + 1
 
     net = LSTMClassifier(1, hidden_dim, vocab_size, embed_dim)
 

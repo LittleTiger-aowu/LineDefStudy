@@ -49,10 +49,10 @@ weighted_graph = args.weighted_graph
 save_every_epochs = 5
 exp_name = args.exp_name
 
-save_model_dir = '../output/model/LineDef/'
-intermediate_output_dir = '../output/intermediate_output/LineDef/cross-project/'
-prediction_dir = '../output/prediction/LineDef/cross-project/'
-file_lvl_gt = '../datasets/preprocessed_data/'
+save_model_dir = 'E:/project/WYP/LineDefStudy/Dataset/output/model/LineDef/'
+intermediate_output_dir = 'E:/project/WYP/LineDefStudy/Dataset/output/intermediate_output/LineDef/cross-project/'
+prediction_dir = 'E:/project/WYP/LineDefStudy/Dataset/output/prediction/LineDef/cross-project/'
+file_lvl_gt = 'E:/project/WYP/LineDefStudy/Dataset/preprocessed_data/'
 
 if not os.path.exists(prediction_dir):
     os.makedirs(prediction_dir)
@@ -76,7 +76,7 @@ def predict_defective_files_in_releases(dataset_name, target_epochs):
     word2vec = Word2Vec.load(word2vec_file_dir)
     print('load Word2Vec for',dataset_name,'finished')
 
-    total_vocab = len(word2vec.wv.vocab)
+    total_vocab = len(word2vec.wv.key_to_index)
 
     vocab_size = total_vocab + 1  # for unknown tokens
         

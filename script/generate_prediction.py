@@ -39,16 +39,16 @@ weighted_graph = args.weighted_graph
 save_every_epochs = 5
 exp_name = args.exp_name
 
-save_model_dir = '../output/model/LineDef/'
-prediction_dir = '../output/prediction/LineDef/within-release/'
-file_lvl_gt = '../datasets/preprocessed_data/'
+save_model_dir = 'E:/project/WYP/LineDefStudy/Dataset/output/model/LineDef/'
+prediction_dir = 'E:/project/WYP/LineDefStudy/Dataset/output/prediction/LineDef/within-release/'
+file_lvl_gt = 'E:/project/WYP/LineDefStudy/Dataset/preprocessed_data/'
 
 if not os.path.exists(prediction_dir):
     os.makedirs(prediction_dir)
 
 
 def predict_defective_files_in_releases(dataset_name, target_epochs):
-    intermediate_output_dir = '../output/intermediate_output/DeepLineDP/within-release/'
+    intermediate_output_dir = 'E:/project/WYP/LineDefStudy/Dataset/output/intermediate_output/DeepLineDP/within-release/'
     actual_save_model_dir = save_model_dir+dataset_name+'/'
 
     train_rel = all_train_releases[dataset_name]
@@ -61,7 +61,7 @@ def predict_defective_files_in_releases(dataset_name, target_epochs):
     word2vec = Word2Vec.load(word2vec_file_dir)
     print('load Word2Vec for', dataset_name, 'finished')
 
-    total_vocab = len(word2vec.wv.vocab)
+    total_vocab = len(word2vec.wv.key_to_index)
 
     vocab_size = total_vocab + 1  # for unknown tokens
   
@@ -81,7 +81,7 @@ def predict_defective_files_in_releases(dataset_name, target_epochs):
 
     else:
         checkpoint = torch.load(actual_save_model_dir+exp_name+'/checkpoint_'+exp_name+'_'+target_epochs+'epochs.pth', map_location=device)
-        intermediate_output_dir = '../output/intermediate_output/DeepLineDP/within-release/' + exp_name
+        intermediate_output_dir = 'E:/project/WYP/LineDefStudy/Dataset/output/intermediate_output/DeepLineDP/within-release/' + exp_name
 
     model.load_state_dict(checkpoint['model_state_dict'])
 

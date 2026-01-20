@@ -1,14 +1,16 @@
-"""
-Prepare CPDP file-level data.
+﻿"""
+Prepare Chapter 3 parquet data.
 
 Example:
-  python script/cpdp-file-level/prepare_cpdp_data.py --csv_glob "data/**/*.csv"
+  python script/ch3/prepare_all_data.py --csv_glob "data/**/*.csv"
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import re
+from glob import glob
 from pathlib import Path
 
 import pandas as pd
@@ -47,23 +49,36 @@ def canonicalize_src(src: str) -> str:
 
 
 def sha1_text(text: str) -> str:
-    return hashlib.sha1(text.encode("utf-8"), usedforsecurity=False).hexdigest()
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()
+
+
+def count_loc(src: str) -> int:
+    return sum(1 for line in src.splitlines() if line.strip())
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--csv_glob", default="data/**/*_ground-truth-files_dataset.csv")
-    parser.add_argument("--output", default="data/cpdp/all_files.parquet")
+    parser.add_argument("--output", default="data/processed/all_files.parquet")
+    parser.add_argument("--project_vocab", default="data/processed/project_vocab.json")
+    parser.add_argument("--lang", default="java")
     args = parser.parse_args()
 
-    paths = [Path(p) for p in Path(".").glob(args.csv_glob)]
+    if Path(args.csv_glob).is_absolute():
+        paths = [Path(p) for p in glob(args.csv_glob)]
+    else:
+        paths = [Path(p) for p in Path(".").glob(args.csv_glob)]
     if not paths:
         raise FileNotFoundError(f"No CSV files found for glob: {args.csv_glob}")
 
     records = []
+    projects = []
     for csv_path in paths:
         project, version = parse_project_version(csv_path)
-        df = pd.read_csv(csv_path)
+        try:
+            df = pd.read_csv(csv_path)
+        except UnicodeDecodeError:
+            df = pd.read_csv(csv_path, encoding="latin1")
         expected_cols = {"File", "Bug", "SRC"}
         if not expected_cols.issubset(df.columns):
             missing = expected_cols - set(df.columns)
@@ -82,14 +97,27 @@ def main() -> None:
                     "y": int(row["Bug"]),
                     "src": src,
                     "sha1": sha1_text(canonical_src),
+                    "lang": args.lang,
+                    "src_len": len(src),
+                    "loc": count_loc(src),
                 }
             )
+        projects.append(project)
 
     out_df = pd.DataFrame.from_records(records)
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     out_df.to_parquet(output_path, index=False)
+
+    unique_projects = sorted(out_df["project"].unique().tolist())
+    project_vocab = {name: idx for idx, name in enumerate(unique_projects)}
+    vocab_path = Path(args.project_vocab)
+    vocab_path.parent.mkdir(parents=True, exist_ok=True)
+    with vocab_path.open("w", encoding="utf-8") as f:
+        json.dump(project_vocab, f, indent=2)
+
     print(f"Saved {len(out_df)} rows to {output_path}")
+    print(f"Saved project vocab with {len(project_vocab)} entries to {vocab_path}")
 
 
 if __name__ == "__main__":

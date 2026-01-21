@@ -77,6 +77,7 @@ def main() -> None:
     parser.add_argument("--dump-block-text", type=int, default=0)
     parser.add_argument("--codebert-path", default="E:\\project\\WYP\\CPDP\\CodeBert")
     parser.add_argument("--local-files-only", type=int, default=1)
+    parser.add_argument("--max-blocks-per-file", type=int, default=128)
     args = parser.parse_args()
 
     ckpt = torch.load(args.ckpt, map_location="cpu")
@@ -102,6 +103,7 @@ def main() -> None:
             win_size_lines=args.win_size_lines,
             window=args.w,
             include_block_text=bool(args.dump_block_text),
+            max_blocks_per_file=args.max_blocks_per_file,
         )
 
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, collate_fn=_collate)
@@ -154,6 +156,7 @@ def main() -> None:
 
     blocks_per_file = []
     parse_ok_list = []
+    parse_error_list = []
     coverage_list = []
     overlap_list = []
     alpha_entropy_list = []
@@ -170,6 +173,7 @@ def main() -> None:
                 struct_stats = batch["struct_stats"].to(device)
                 edge_indices = batch["edge_indices"]
                 parse_ok = batch["file_parse_ok"].cpu().numpy().tolist()
+                parse_has_error = batch["file_parse_has_error"].cpu().numpy().tolist()
                 meta = batch["meta"]
 
                 h_sem = encoder(input_ids, attention_mask)
@@ -203,6 +207,7 @@ def main() -> None:
                     type_strs = meta["type_strs"][i]
                     num_blocks = meta["num_blocks"][i]
                     parse_flag = bool(parse_ok[i])
+                    parse_error_flag = bool(parse_has_error[i])
 
                     assert_non_overlap(spans, uid)
 
@@ -215,6 +220,7 @@ def main() -> None:
                         "sha1": meta["sha1"][i],
                         "num_blocks": int(num_blocks),
                         "parse_ok": parse_flag,
+                        "parse_has_error": parse_error_flag,
                         "spans": [list(span) for span in spans],
                         "type_ids": [int(t) for t in type_ids],
                         "type_strs": type_strs,
@@ -229,6 +235,7 @@ def main() -> None:
                     alpha_seg = alpha_vals[start:end]
                     blocks_per_file.append(num_blocks)
                     parse_ok_list.append(parse_flag)
+                    parse_error_list.append(parse_error_flag)
                     cov, ov = coverage_overlap(spans)
                     coverage_list.append(cov)
                     overlap_list.append(ov)
@@ -307,6 +314,7 @@ def main() -> None:
             "p90": float(np.percentile(blocks_per_file, 90)) if blocks_per_file else 0.0,
         },
         "parse_fail_ratio": float(1.0 - np.mean(parse_ok_list)) if parse_ok_list else 0.0,
+        "parse_error_ratio": float(np.mean(parse_error_list)) if parse_error_list else 0.0,
         "coverage_ratio": {
             "mean": float(np.mean(coverage_list)) if coverage_list else 0.0,
             "p50": float(np.percentile(coverage_list, 50)) if coverage_list else 0.0,

@@ -31,6 +31,7 @@ class Block:
     text: str
     stats: dict
     parse_ok: bool
+    parse_has_error: bool
 
 
 def slice_text_by_span(src: str, span: Tuple[int, int]) -> str:
@@ -153,13 +154,13 @@ def _window_blocks(
     return blocks
 
 
-def _tree_parse_ok(tree) -> bool:
+def _tree_parse_flags(tree) -> tuple[bool, bool]:
     if tree is None:
-        return False
+        return False, False
     root = tree.root_node
     has_error = bool(getattr(root, "has_error", False))
     is_missing = bool(getattr(root, "is_missing", False))
-    return not (has_error or is_missing)
+    return True, bool(has_error or is_missing)
 
 
 def extract_blocks(src: str, lang: str = "java", win_size_lines: int = 20) -> List[Block]:
@@ -168,7 +169,7 @@ def extract_blocks(src: str, lang: str = "java", win_size_lines: int = 20) -> Li
     total_lines = max(1, len(lines))
 
     tree = _parse_with_tree_sitter(normalized, lang)
-    parse_ok = _tree_parse_ok(tree)
+    parse_ok, parse_has_error = _tree_parse_flags(tree)
 
     if parse_ok:
         candidates = _collect_anchor_spans(tree, total_lines)
@@ -194,6 +195,7 @@ def extract_blocks(src: str, lang: str = "java", win_size_lines: int = 20) -> Li
                 text=text,
                 stats=stats,
                 parse_ok=blk_parse_ok,
+                parse_has_error=parse_has_error,
             )
         )
     if not blocks:
@@ -206,6 +208,7 @@ def extract_blocks(src: str, lang: str = "java", win_size_lines: int = 20) -> Li
                 text=normalized if normalized else "",
                 stats={"span_len": 1, "is_fallback": 1, "anchor_flag": 0},
                 parse_ok=False,
+                parse_has_error=False,
             )
         )
     return blocks

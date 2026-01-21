@@ -67,6 +67,16 @@ def main() -> None:
     parser.add_argument("--lr-other", type=float, default=1e-3)
     parser.add_argument("--codebert-path", default="E:\\project\\WYP\\CPDP\\CodeBert")
     parser.add_argument("--local-files-only", type=int, default=1)
+    parser.add_argument("--use-amp", type=int, default=1)
+    parser.add_argument("--grad-accum-steps", type=int, default=4)
+    parser.add_argument("--freeze-encoder", type=int, default=1)
+    parser.add_argument("--encoder-device", default="cpu")
+    parser.add_argument("--max-blocks-per-file", type=int, default=128)
+    parser.add_argument("--max-total-blocks", type=int, default=512)
+    parser.add_argument("--shuffle", type=int, default=1)
+    parser.add_argument("--log-uid", type=int, default=0)
+    parser.add_argument("--log-mem", type=int, default=0)
+    parser.add_argument("--log-every", type=int, default=1)
     parser.add_argument("--seed", type=int, default=1337)
     args = parser.parse_args()
 
@@ -92,11 +102,18 @@ def main() -> None:
             tmax=args.tmax,
             win_size_lines=args.win_size_lines,
             window=args.w,
+            max_blocks_per_file=args.max_blocks_per_file,
         )
 
-    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, collate_fn=_collate)
+    loader = DataLoader(
+        dataset,
+        batch_size=args.batch_size,
+        shuffle=bool(args.shuffle),
+        collate_fn=_collate,
+    )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    encoder_device = torch.device(args.encoder_device)
 
     encoder = CodeBertBlockEncoder(args.codebert_path, local_files_only=bool(args.local_files_only))
     type_embed = TypeEmbedding(num_block_types(), args.d_t)
@@ -109,22 +126,29 @@ def main() -> None:
         input_dim=768 + args.d_t + args.d_p,
     )
 
-    encoder.to(device)
+    if args.freeze_encoder:
+        for p in encoder.parameters():
+            p.requires_grad = False
+        encoder.eval()
+    encoder.to(encoder_device)
     type_embed.to(device)
     stats_mlp.to(device)
     model.to(device)
 
-    optimizer = torch.optim.AdamW(
-        [
-            {"params": encoder.parameters(), "lr": args.lr_codebert},
-            {"params": type_embed.parameters(), "lr": args.lr_other},
-            {"params": stats_mlp.parameters(), "lr": args.lr_other},
-            {"params": model.parameters(), "lr": args.lr_other},
-        ]
-    )
+    optim_params = [
+        {"params": type_embed.parameters(), "lr": args.lr_other},
+        {"params": stats_mlp.parameters(), "lr": args.lr_other},
+        {"params": model.parameters(), "lr": args.lr_other},
+    ]
+    if not args.freeze_encoder:
+        optim_params.insert(0, {"params": encoder.parameters(), "lr": args.lr_codebert})
+    optimizer = torch.optim.AdamW(optim_params)
 
     bug_loss_fn = nn.BCEWithLogitsLoss()
     pr_loss_fn = nn.CrossEntropyLoss()
+    use_amp = bool(args.use_amp) and device.type == "cuda"
+    encoder_amp = use_amp and encoder_device.type == "cuda"
+    scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -133,7 +157,8 @@ def main() -> None:
     best_loss = None
 
     for epoch in range(args.epochs):
-        encoder.train()
+        if not args.freeze_encoder:
+            encoder.train()
         type_embed.train()
         stats_mlp.train()
         model.train()
@@ -145,14 +170,16 @@ def main() -> None:
         alpha_entropy_acc = []
         parse_fail_acc = []
 
-        for batch in loader:
-            input_ids = batch["flat_input_ids"].to(device)
-            attention_mask = batch["flat_attention_mask"].to(device)
+        optimizer.zero_grad()
+        for step, batch in enumerate(loader, start=1):
+            input_ids = batch["flat_input_ids"].to(encoder_device)
+            attention_mask = batch["flat_attention_mask"].to(encoder_device)
             blk_ptr = batch["blk_ptr"].to(device)
             struct_type_ids = batch["struct_type_ids"].to(device)
             struct_stats = batch["struct_stats"].to(device)
             edge_indices = batch["edge_indices"]
             parse_ok = batch["file_parse_ok"].to(device)
+            parse_has_error = batch["file_parse_has_error"].to(device)
 
             meta = batch["meta"]
             y = torch.tensor(meta["y"], dtype=torch.float, device=device)
@@ -162,21 +189,35 @@ def main() -> None:
                 device=device,
             )
 
-            h_sem = encoder(input_ids, attention_mask)
-            type_emb = type_embed(struct_type_ids)
-            stats_emb = stats_mlp(struct_stats)
-            e_struct = torch.cat([type_emb, stats_emb], dim=1)
+            if args.freeze_encoder:
+                with torch.no_grad():
+                    with torch.cuda.amp.autocast(enabled=encoder_amp):
+                        h_sem = encoder(input_ids, attention_mask)
+            else:
+                with torch.cuda.amp.autocast(enabled=encoder_amp):
+                    h_sem = encoder(input_ids, attention_mask)
+            if encoder_device != device:
+                h_sem = h_sem.to(device, non_blocking=True)
 
-            outputs = model(h_sem, e_struct, blk_ptr, edge_indices=edge_indices)
+            with torch.cuda.amp.autocast(enabled=use_amp):
+                type_emb = type_embed(struct_type_ids)
+                stats_emb = stats_mlp(struct_stats)
+                e_struct = torch.cat([type_emb, stats_emb], dim=1)
 
-            loss_bug = bug_loss_fn(outputs["logit_bug"].squeeze(-1), y)
-            loss_pr = pr_loss_fn(outputs["logits_pr_dom"], proj_ids)
-            loss_ortho = outputs["loss_ortho"]
-            loss_total = loss_bug + args.lambda_pr * loss_pr + args.lambda_ortho * loss_ortho
+                outputs = model(h_sem, e_struct, blk_ptr, edge_indices=edge_indices)
 
-            optimizer.zero_grad()
-            loss_total.backward()
-            optimizer.step()
+                loss_bug = bug_loss_fn(outputs["logit_bug"].squeeze(-1), y)
+                loss_pr = pr_loss_fn(outputs["logits_pr_dom"], proj_ids)
+                loss_ortho = outputs["loss_ortho"]
+                loss_total = loss_bug + args.lambda_pr * loss_pr + args.lambda_ortho * loss_ortho
+                loss_scaled = loss_total / max(args.grad_accum_steps, 1)
+
+            scaler.scale(loss_scaled).backward()
+
+            if step % max(args.grad_accum_steps, 1) == 0:
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
 
             loss_total_acc.append(loss_total.item())
             loss_bug_acc.append(loss_bug.item())
@@ -184,6 +225,36 @@ def main() -> None:
             loss_ortho_acc.append(loss_ortho.item())
             alpha_entropy_acc.append(alpha_entropy(outputs["alpha_values"], blk_ptr, parse_ok))
             parse_fail_acc.append(1.0 - float(parse_ok.float().mean().item()))
+            parse_error_acc = float(parse_has_error.float().mean().item())
+            if step % max(args.log_every, 1) == 0:
+                total_blocks = int(blk_ptr[-1].item())
+                k_max = int((blk_ptr[1:] - blk_ptr[:-1]).max().item())
+                parse_ok_ratio = float(parse_ok.float().mean().item())
+                seq_len = int(batch["flat_input_ids"].shape[1])
+                tok_counts = batch["flat_attention_mask"].sum(dim=1).float()
+                tok_max = int(tok_counts.max().item()) if tok_counts.numel() > 0 else 0
+                tok_p95 = int(torch.quantile(tok_counts, 0.95).item()) if tok_counts.numel() > 0 else 0
+                uid0 = meta["uid"][0] if args.log_uid and "uid" in meta else None
+                msg = (
+                    f"batch {step} total_blocks={total_blocks} k_max={k_max} "
+                    f"seq_len={seq_len} tok_max={tok_max} tok_p95={tok_p95} "
+                    f"parse_ok={parse_ok_ratio:.3f} parse_err={parse_error_acc:.3f}"
+                )
+                if uid0:
+                    msg = f"{msg} uid={uid0}"
+                if args.log_mem and device.type == "cuda":
+                    alloc = torch.cuda.memory_allocated() / 1024**3
+                    resv = torch.cuda.memory_reserved() / 1024**3
+                    peak = torch.cuda.max_memory_allocated() / 1024**3
+                    msg = f"{msg} mem_alloc={alloc:.2f}G mem_resv={resv:.2f}G mem_peak={peak:.2f}G"
+                print(msg)
+            total_blocks = int(blk_ptr[-1].item())
+            if args.max_total_blocks > 0 and total_blocks > args.max_total_blocks:
+                if args.log_uid and "uid" in meta:
+                    print(f"skip batch {step} uid={meta['uid'][0]} total_blocks={total_blocks}")
+                else:
+                    print(f"skip batch {step} total_blocks={total_blocks}")
+                continue
 
         epoch_log = {
             "epoch": epoch + 1,
@@ -194,6 +265,7 @@ def main() -> None:
             "alpha_entropy_mean": float(np.mean(alpha_entropy_acc)),
             "ortho_fro_batch": float(np.mean(loss_ortho_acc)),
             "parse_fail_ratio_batch": float(np.mean(parse_fail_acc)),
+            "parse_error_ratio_batch": parse_error_acc,
         }
         with log_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(epoch_log))

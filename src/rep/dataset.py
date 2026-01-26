@@ -17,6 +17,10 @@ class FileSample:
     y: int
     src: str
     sha1: str
+    is_template: int = 0
+    missing_src: int = 0
+    base_line: int = 1
+    class_name: str = ""
 
 
 class FileDataset:
@@ -54,6 +58,10 @@ class FileDataset:
             y=int(row["y"]),
             src=str(row["src"]),
             sha1=row["sha1"],
+            is_template=int(row["is_template"]) if "is_template" in row else 0,
+            missing_src=int(row["missing_src"]) if "missing_src" in row else 0,
+            base_line=int(row["base_line"]) if "base_line" in row else 1,
+            class_name=str(row["class_name"]) if "class_name" in row else "",
         )
 
 

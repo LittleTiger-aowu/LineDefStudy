@@ -54,7 +54,8 @@ class RepresentationModel(nn.Module):
         self.f_sh = nn.Sequential(nn.Linear(d_h, d_sh), nn.ReLU(), nn.Linear(d_sh, d_sh))
         self.f_pr = nn.Sequential(nn.Linear(d_h, d_pr), nn.ReLU(), nn.Linear(d_pr, d_pr))
         self.d_pr = nn.Linear(d_pr, num_projects)
-        self.bug_head = nn.Linear(d_h, 1)
+        self.bug_head_file = nn.Linear(d_h, 1)
+        self.bug_head_sh = nn.Linear(d_sh, 1)
 
     def forward(
         self,
@@ -62,27 +63,38 @@ class RepresentationModel(nn.Module):
         e_struct: torch.Tensor,
         blk_ptr: torch.Tensor,
         edge_indices: Optional[list[torch.Tensor]] = None,
+        use_gcn: bool = True,
     ) -> Dict[str, torch.Tensor]:
         # h_sem: [TotalBlocks, 768], e_struct: [TotalBlocks, d_s]
         assert h_sem.dim() == 2 and e_struct.dim() == 2, "inputs must be 2D"
         assert h_sem.size(0) == e_struct.size(0), "h_sem and e_struct must align"
         h0 = torch.cat([h_sem, e_struct], dim=1)
         h0 = self.fusion(h0)
-        if edge_indices is None:
-            edge_indices = []
-            for i in range(len(blk_ptr) - 1):
-                k = int(blk_ptr[i + 1] - blk_ptr[i])
-                edge_indices.append(build_sliding_window_edges(k, window=2))
-        num_nodes = [int(blk_ptr[i + 1] - blk_ptr[i]) for i in range(len(blk_ptr) - 1)]
-        edge_index = batch_merge_edges(edge_indices, num_nodes).to(h0.device)
-        h1 = self.gcn1(h0, edge_index)
-        h1 = torch.relu(h1)
-        h_blk = self.gcn2(h1, edge_index)
+        if use_gcn:
+            if edge_indices is None:
+                edge_indices = []
+                for i in range(len(blk_ptr) - 1):
+                    k = int(blk_ptr[i + 1] - blk_ptr[i])
+                    edge_indices.append(build_sliding_window_edges(k, window=2))
+            blk_ptr_cpu = blk_ptr.detach().cpu()
+            num_nodes = [int(blk_ptr_cpu[i + 1] - blk_ptr_cpu[i]) for i in range(len(blk_ptr_cpu) - 1)]
+            edge_index = batch_merge_edges(edge_indices, num_nodes).to(h0.device)
+            if edge_index.numel() > 0:
+                valid = (edge_index[0] >= 0) & (edge_index[1] >= 0)
+                max_node = h0.size(0)
+                valid &= (edge_index[0] < max_node) & (edge_index[1] < max_node)
+                edge_index = edge_index[:, valid]
+            h1 = self.gcn1(h0, edge_index)
+            h1 = torch.relu(h1)
+            h_blk = self.gcn2(h1, edge_index)
+        else:
+            h_blk = h0
         h_file, alpha = self.att_pool(h_blk, blk_ptr)
         z_sh = self.f_sh(h_file)
         z_pr = self.f_pr(h_file)
         logits_pr_dom = self.d_pr(z_pr)
-        logit_bug = self.bug_head(h_file)
+        logit_bug_file = self.bug_head_file(h_file)
+        logit_bug_sh = self.bug_head_sh(z_sh)
         loss_ortho = orthogonality_loss(z_sh, z_pr)
         return {
             "H_blk": h_blk,
@@ -91,6 +103,7 @@ class RepresentationModel(nn.Module):
             "Z_sh": z_sh,
             "Z_pr": z_pr,
             "logits_pr_dom": logits_pr_dom,
-            "logit_bug": logit_bug,
+            "logit_bug_file": logit_bug_file,
+            "logit_bug_sh": logit_bug_sh,
             "loss_ortho": loss_ortho,
         }

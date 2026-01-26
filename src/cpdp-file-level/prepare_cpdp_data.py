@@ -56,7 +56,7 @@ def main() -> None:
     parser.add_argument("--output", default="data/cpdp/all_files.parquet")
     args = parser.parse_args()
 
-    paths = [Path(p) for p in Path(".").glob(args.csv_glob)]
+    paths = [Path(p) for p in Path("").glob(args.csv_glob)]
     if not paths:
         raise FileNotFoundError(f"No CSV files found for glob: {args.csv_glob}")
 

@@ -2,7 +2,7 @@
 Prepare Chapter 3 parquet data.
 
 Example:
-  python script/ch3/prepare_all_data.py --csv_glob "data/**/*.csv"
+  python src/ch3/prepare_all_data.py --csv_glob "data/**/*.csv"
 """
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ def main() -> None:
     if Path(args.csv_glob).is_absolute():
         paths = [Path(p) for p in glob(args.csv_glob)]
     else:
-        paths = [Path(p) for p in Path(".").glob(args.csv_glob)]
+        paths = [Path(p) for p in Path("").glob(args.csv_glob)]
     if not paths:
         raise FileNotFoundError(f"No CSV files found for glob: {args.csv_glob}")
 

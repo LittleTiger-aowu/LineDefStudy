@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import torch
 from torch import nn
+from torch.nn import functional as F
 
 
 def orthogonality_loss(z_sh: torch.Tensor, z_pr: torch.Tensor) -> torch.Tensor:
     # z_sh: [B, d_sh], z_pr: [B, d_pr]
-    z_sh_norm = torch.nn.functional.normalize(z_sh, p=2, dim=1)
-    z_pr_norm = torch.nn.functional.normalize(z_pr, p=2, dim=1)
-    c = torch.matmul(z_sh_norm.transpose(0, 1), z_pr_norm)
+    z_sh_norm = F.normalize(z_sh.float(), p=2, dim=1)
+    z_pr_norm = F.normalize(z_pr.float(), p=2, dim=1)
+    batch = max(z_sh_norm.size(0), 1)
+    c = torch.matmul(z_sh_norm.transpose(0, 1), z_pr_norm) / batch
     return torch.norm(c, p="fro")
 
 
@@ -18,4 +20,3 @@ def pr_domain_loss(logits_pr_dom: torch.Tensor, project_id: torch.Tensor) -> tor
 
 def bug_loss(logit_bug: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     return nn.BCEWithLogitsLoss()(logit_bug.squeeze(-1), y.float())
-

@@ -2,7 +2,7 @@
 Dump Chapter 3 representations and interpretability artifacts.
 
 Example:
-  python script/ch3/dump_representations.py --data-parquet data/processed/all_files.parquet --ckpt outputs/ch3_ckpt/best.pt --outdir outputs/ch3_dump/run1
+  python src/ch3/dump_representations.py --data-parquet data/processed/all_files.parquet --ckpt outputs/ch3_ckpt/best.pt --outdir outputs/ch3_dump/run1
 """
 from __future__ import annotations
 
